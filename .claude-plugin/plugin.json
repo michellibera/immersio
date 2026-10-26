@@ -1,0 +1,9 @@
+{
+  "name": "immersio",
+  "version": "0.1.0",
+  "description": "Short terminal answers, plus one-screen HTML infographics on demand (/viz) shown live in a local page.",
+  "author": {
+    "name": "Michel Libera"
+  },
+  "keywords": ["visualization", "infographic", "output-style", "concise"]
+}

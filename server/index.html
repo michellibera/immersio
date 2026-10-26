@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Immersio</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/style.css">
+<style>
+  body { max-width: 1120px; margin: 0 auto; padding: 0 16px 64px; }
+  .bar { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--line); background: var(--bg); }
+  .bar h1 { margin: 0; font-size: 15px; letter-spacing: 0.02em; }
+  .bar .count { color: var(--muted); font-size: 13px; }
+  .status { display: flex; align-items: center; gap: 6px; margin-left: auto; color: var(--muted); font-size: 12px; }
+  .status::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--warn); }
+  .status.live::before { background: var(--ok); }
+  .entry { margin-top: 28px; }
+  .entry header { display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; color: var(--muted); font-size: 13px; }
+  .entry header b { color: var(--fg); font-size: 15px; }
+  .entry header a { margin-left: auto; color: var(--muted); text-decoration: none; }
+  .entry header a:hover { color: var(--accent); }
+  .entry iframe { display: block; width: 100%; height: 60vh; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg); }
+  .entry.fresh iframe { animation: fresh 1.8s ease-out; }
+  @keyframes fresh { from { box-shadow: 0 0 0 3px var(--accent); } to { box-shadow: 0 0 0 3px transparent; } }
+  .empty { margin-top: 72px; color: var(--muted); text-align: center; }
+</style>
+</head>
+<body>
+<div class="bar">
+  <h1>Immersio</h1>
+  <span class="count" id="count"></span>
+  <span class="status" id="status">connecting</span>
+</div>
+<main id="timeline"></main>
+<p class="empty" id="empty" hidden>No infographics yet. Run <code>/viz</code> in Claude Code.</p>
+<script>
+"use strict";
+// Timeline of infographics, newest on top. Each one runs in <iframe sandbox="allow-scripts">
+// without allow-same-origin, so its scripts can't reach this page or the server's API.
+const timeline = document.getElementById("timeline");
+const statusEl = document.getElementById("status");
+const countEl = document.getElementById("count");
+const emptyEl = document.getElementById("empty");
+const cards = new Map(); // file name -> {el, frame, title, mtime}
+let rendered = false;
+
+function render(items) { // items: [{name, title, mtime}], newest first
+  const seen = new Set();
+  let prev = null;
+  for (const item of items) {
+    seen.add(item.name);
+    let card = cards.get(item.name);
+    if (!card) {
+      card = createCard(item);
+      cards.set(item.name, card);
+      if (rendered) card.el.classList.add("fresh");
+    } else if (card.mtime !== item.mtime) { // rewritten (or caught mid-write): reload only this one
+      card.mtime = item.mtime;
+      card.title.textContent = item.title;
+      card.frame.src = frameUrl(item);
+    }
+    // Moving an iframe reloads it, so touch the DOM only where the order is wrong.
+    const expected = prev ? prev.el.nextSibling : timeline.firstChild;
+    if (card.el !== expected) timeline.insertBefore(card.el, expected);
+    prev = card;
+  }
+  for (const [name, card] of cards) {
+    if (!seen.has(name)) { card.el.remove(); cards.delete(name); }
+  }
+  emptyEl.hidden = items.length > 0;
+  countEl.textContent = items.length ? String(items.length) : "";
+  document.title = items.length ? `Immersio (${items.length})` : "Immersio";
+  rendered = true;
+}
+
+function createCard(item) {
+  const el = document.createElement("article");
+  el.className = "entry";
+  const header = document.createElement("header");
+  const number = document.createElement("span");
+  const match = /^\d+/.exec(item.name);
+  number.textContent = match ? `#${Number(match[0])}` : "";
+  const title = document.createElement("b");
+  title.textContent = item.title;
+  const time = document.createElement("time");
+  time.textContent = new Date(item.mtime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const open = document.createElement("a");
+  open.href = `/f/${encodeURIComponent(item.name)}`;
+  open.target = "_blank";
+  open.rel = "noopener";
+  open.textContent = "open ↗";
+  header.append(number, title, time, open);
+  const frame = document.createElement("iframe");
+  frame.setAttribute("sandbox", "allow-scripts");
+  frame.title = item.title;
+  frame.src = frameUrl(item);
+  el.append(header, frame);
+  return { el, frame, title, mtime: item.mtime };
+}
+
+function frameUrl(item) {
+  return `/f/${encodeURIComponent(item.name)}?v=${item.mtime}`;
+}
+
+// The server appends a script to each infographic that posts its content height.
+addEventListener("message", (event) => {
+  const data = event.data;
+  if (!data || data.immersio !== "height" || typeof data.h !== "number") return;
+  for (const card of cards.values()) {
+    if (card.frame.contentWindow === event.source) {
+      card.frame.style.height = `${Math.max(80, Math.min(data.h + 2, 8000))}px`;
+      return;
+    }
+  }
+});
+
+function setLive(live) {
+  statusEl.classList.toggle("live", live);
+  statusEl.textContent = live ? "live" : "reconnecting";
+}
+
+// EventSource retries by itself after a dropped connection; if the browser gives up
+// (readyState CLOSED), open a new one with backoff.
+let retryMs = 1000;
+function connect() {
+  const source = new EventSource("/events");
+  source.addEventListener("files", (event) => render(JSON.parse(event.data)));
+  source.onopen = () => { setLive(true); retryMs = 1000; };
+  source.onerror = () => {
+    setLive(false);
+    if (source.readyState === EventSource.CLOSED) {
+      setTimeout(connect, retryMs);
+      retryMs = Math.min(retryMs * 2, 15000);
+    }
+  };
+}
+
+fetch("/files").then((r) => r.json()).then(render).catch(() => {});
+connect();
+</script>
+</body>
+</html>
