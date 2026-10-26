@@ -20,15 +20,31 @@ Request: `$ARGUMENTS`
 
 The form follows the content, not habit: pick from this alphabet by the kind of information, never default to prose. Combine several forms when the content has several kinds.
 
-| Form | Content | Build with |
-|---|---|---|
-| Thesis | definition, conclusion, assumption, short idea | `h1` + `.callout` |
-| Flow | process, sequence, causality, data flow | `.flow` (`.vertical` for long ones) |
-| Relation map | dependencies, impact, part-whole, systems | inline SVG: nodes, typed edge labels |
-| Table / matrix | comparison, criteria, trade-offs, alternatives | `.table` |
-| Hierarchy | decomposition into parts | nested `ul`, or `.grid` of `.card`s |
-| Source | code, file, doc excerpt, input data | `pre` + `.muted` path (`file:line`) |
+Choose the form with the DSRP lens (Cabrera): meaning is information plus how it is structured, so ask four questions of the subject and let the answers pick the form.
 
+- **D**istinction: what is it, and what is it not? Name the boundary.
+- **S**ystem: what are its parts, and what is it a part of?
+- **R**elationship: what acts on what, and with what effect?
+- **P**erspective: who looks from where, and what changes from another view?
+
+| Form | DSRP | Content | Build with |
+|---|---|---|---|
+| Thesis | D | definition, conclusion, assumption, short idea | `h1` + `.callout`; say what it is not |
+| Flow | R | process, sequence, causality, data flow | `.flow` (`.vertical` for long ones) |
+| Relation map | R, S | dependencies, impact, part-whole, systems | inline SVG: nodes, edges typed by style (depends on, impacts, part of) |
+| Table / matrix | P, D | comparison, criteria, trade-offs, alternatives | `.table`; columns are perspectives or options |
+| Hierarchy | S | decomposition into parts | nested `ul`, or `.grid` of `.card`s |
+| Mind map | D, S | gather thoughts: brainstorm, open questions, unsorted ideas | centre `.node.accent`, branches around it (SVG or `.grid`); links unlabeled |
+| Concept map | S, R | organize understanding: concepts joined by stated propositions | inline SVG; every edge labeled with a verb phrase ("causes", "requires") |
+| System map | S, R | map the system: parts, boundary, flows, feedback loops | inline SVG; boundary box, parts inside, outside actors beyond it, loops marked |
+| Mental model | P | what a given person believes about how it works, to understand and communicate it | two `.card`s side by side: their model vs the actual one; gaps as `.tag.warn` |
+| Conceptual model | S, R, P | a new way to think about a complex system: a reframing or metaphor | few elements and a name; `.callout` states the reframing in one sentence |
+| Source | none | code, file, doc excerpt, input data | `pre` + `.muted` path (`file:line`) |
+
+Pick the map by what the thinking is for: gather → mind map; organize → concept map; map the system → system map; communicate someone's understanding → mental model; offer a new way to think about a complex system → conceptual model. A relation map is the light version: dependencies without stated propositions or system boundary.
+
+- Add facts only when they sharpen the structure. A list of new facts with the same structure teaches less than one changed structure (a new boundary, a regrouping, a hidden relation, another viewpoint).
+- When the subject has real trade-offs, show at least two perspectives side by side (for example readability, testability, risk, maintenance, scale) instead of the first two that come to mind.
 - No `.card` frame when the content reads fine without one; use it to group parallel items, not to wrap everything.
 - Show only the relations the one idea needs; leave the rest out.
 - Mark epistemic status where it matters: observed fact, decision, conclusion, hypothesis. Use `.tag` (`.ok` fact, `.warn` hypothesis, `.bad` risk) and keep contradictions visible but quiet.
